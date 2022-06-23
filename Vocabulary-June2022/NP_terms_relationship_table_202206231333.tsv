@@ -1,0 +1,7 @@
+"relationship_id"	"relationship_name"	"is_hierarchical"	"defines_ancestry"	"reverse_relationship_id"	"relationship_concept_id"
+napdi_has_const	NaPDI has constituent	"0"	"0"	-7000001	-7000000
+napdi_is_const_of	NaPDI is constituent of	"0"	"0"	-7000000	-7000001
+napdi_pt	NaPDI NP preferred term	"0"	"0"	-7000003	-7000002
+napdi_is_pt_of	NaPDI is preferred term of 	"0"	"0"	-7000002	-7000003
+napdi_spell_vr	NaPDI spelling variation	"0"	"0"	-7000005	-7000004
+napdi_is_spell_vr_of	NaPDI is spelling variation of	"0"	"0"	-7000004	-7000005
