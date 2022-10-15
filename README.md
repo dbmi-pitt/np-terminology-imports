@@ -9,7 +9,7 @@ A natural product terminology that maps botanical natural product (NP) Latin bin
 
 ### Versions
 
-* v1.0.0: custom NP concepts, chemical constituents, and common names in OMOP. Spelling variations included for [65 natural products]().
-* v1.0.1: added mappings from NP concepts to RxNorm concepts (when available).
+* [v1.0.1](https://github.com/dbmi-pitt/np-terminology-imports/tree/main/Vocabulary-tables/October2022): added mappings from NP concepts to RxNorm concepts (when available).
+* [v1.0.0](https://github.com/dbmi-pitt/np-terminology-imports/tree/main/Vocabulary-tables/June2022): custom NP concepts, chemical constituents, and common names in OMOP. Spelling variations included for [67 natural products](https://github.com/dbmi-pitt/np-terminology-imports/wiki/Natural-Products-List).
 
 For more details, see [wiki](https://github.com/dbmi-pitt/np-terminology-imports/wiki).
