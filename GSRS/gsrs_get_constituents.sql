@@ -1,4 +1,6 @@
+--run gsrs_add_missing_substances.sql first
 drop table if exists test_srs_np_constituent
+
 create table test_srs_np_constituent (
 	uuid varchar(40),
 	substance_uuid varchar(40),
@@ -9,11 +11,11 @@ create table test_srs_np_constituent (
 	constituent_name varchar(255),
 	constituent_type varchar(20)
 )
---count old = 993
-select count(*) from scratch_sanya.test_srs_np_constituent_old tsnc 
---count = 1091
+
+--count = 1149
 select count(*) from scratch_sanya.test_srs_np_constituent
 
+--N=1100 (g_substance_reg)
 insert into test_srs_np_constituent (substance_uuid, related_common_name, related_latin_binomial, uuid, relation_type, 
 constituent_name, constituent_uuid)
 select tsnpr.owner_uuid as substance_uuid, tsnpr.related_common_name, tsnpr.related_latin_binomial, tsnpr.uuid, tsnpr."type" as relation_type, 
@@ -23,6 +25,7 @@ inner join public.ix_ginas_substanceref igs on tsnpr.related_substance_uuid = ig
 and tsnpr."type" in ('ACTIVE CONSTITUENT ALWAYS PRESENT->PARENT', 'ACTIVE CONSTITUENT ALWAYS PRESENT', 'CONSTITUENT ALWAYS PRESENT->PARENT',
 'POSSIBLE ACTIVE CONSTITUENT ALWAYS PRESENT->PARENT', 'CONSTITUENT MAY BE PRESENT->PARENT')
 
+--N=49 (g_substance_reg)
 insert into test_srs_np_constituent (substance_uuid, related_common_name, related_latin_binomial, uuid, relation_type,
 constituent_name, constituent_uuid)
 select tsnpr.owner_uuid as substance_uuid, tsnpr.related_common_name, tsnpr.related_latin_binomial, tsnpr.uuid, tsnpr."type" as relation_type, 
@@ -31,104 +34,28 @@ from test_srs_np_rel tsnpr
 inner join public.ix_ginas_substanceref igs on tsnpr.related_substance_uuid = igs.uuid 
 and tsnpr."type" in ('ACTIVE CONSTITUENT ALWAYS PRESENT->PARENT', 'ACTIVE CONSTITUENT ALWAYS PRESENT', 'CONSTITUENT ALWAYS PRESENT->PARENT',
 'POSSIBLE ACTIVE CONSTITUENT ALWAYS PRESENT->PARENT', 'CONSTITUENT MAY BE PRESENT->PARENT')
---test constituents for 'Milk thistle'
+
+--test constituents for 'Cannabis sativa'
 select * from scratch_sanya.test_srs_np_constituent tsnc 
 where tsnc.related_latin_binomial = 'Cannabis sativa'
+
+--test constituents for 'Milk thistle'
+select * from scratch_sanya.test_srs_np_constituent tsnc 
+where tsnc.related_latin_binomial = 'Silybum marianum'
  
-delete from test_srs_np_constituent_mapped 
-insert into test_srs_np_constituent_mapped
-select substance_uuid, constituent_name, related_latin_binomial, 
-max(case when related_common_name = '' then ltcnt.common_name else related_common_name end) related_common_name,
-constituent_uuid
-from scratch_sanya.test_srs_np_constituent tsnc inner join scratch_sanya.lb_to_common_names_tsv ltcnt on upper(tsnc.related_latin_binomial) = upper(ltcnt.latin_binomial)
-group by substance_uuid, constituent_name, related_latin_binomial, constituent_uuid
+select * from scratch_sanya.test_srs_np_constituent tsnc 
+where tsnc.related_common_name  = 'Green tea'
 
-select * from scratch_sanya.test_srs_np_part tsncm 
-where tsncm.related_latin_binomial = 'Rhodiola rosea'
+--N = 1149 (g_substance_reg)
+select count(*) from scratch_sanya.test_srs_np_constituent tsnc 
 
-select * from scratch_sanya.test_srs_np tsncm 
-where tsncm.related_latin_binomial = 'Rhodiola rosea'
-
----get subspecies for substances where script does not include them directly
---eg. Cannabis sativa subsp. indica, fenugreek seed (Trigonella foenum), Sedum roseum
---get whol substance from substance ID and add to test_srs_np and test_srs_np_part
---then add constituents 
---Cannabis sativa subsp. indica whole substance_uuid = f172ae99-9515-4bff-a8ed-4e68afad1b1d DONE
---TRIGONELLA FOENUM-GRAECUM WHOLE substance_uuid = 7c054d8f-9a41-44bf-ae8f-00f541e4e406 DONE
---SEDUM ROSEUM WHOLE substance_uuid = f42f059e-c9c1-46cf-a593-dcc545abb8d1
---queries taken from Python script - gsrs_get_data_without_mixture.py
-
---add to test_srs_np
-with np_substance as (
-select igs1.uuid as substance_uuid, igs1.* from ix_ginas_substance igs1
-where igs1.uuid = 'f42f059e-c9c1-46cf-a593-dcc545abb8d1'
-),
-np_strucdiv as (
-select * from ix_ginas_strucdiv igs2 
-inner join np_substance on np_substance.structurally_diverse_uuid = igs2.uuid 
-),
-np_parent as (
-select igs3.refuuid as parent_uuid from ix_ginas_substanceref igs3 
-inner join np_strucdiv on np_strucdiv.parent_substance_uuid = igs3.uuid 
-)
-insert into scratch_sanya.test_srs_np 
-select 'Rhodiola rosea' related_latin_binomial, 'Rhodiola' related_common_name, igs.dtype, igs.uuid as substance_uuid, igs.created, igs.class, igs.status, igs.modifications_uuid,
-igs.approval_id, igs.structure_id, igs.structurally_diverse_uuid, 
-ign.uuid as name_uuid, ign.internal_references, ign.owner_uuid, ign."name",
-ign."type", ign.preferred, ign.display_name, 
-ixs.uuid as structdiv_uuid, ixs.source_material_class, ixs.source_material_state, ixs.source_material_type,
-ixs.organism_family, ixs.organism_author, ixs.organism_genus, ixs.organism_species, ixs.part_location,
-ixs.part, ixs.parent_substance_uuid 
-from ix_ginas_substance igs 
-inner join ix_ginas_name as ign on ign.owner_uuid = igs.uuid 
-inner join ix_ginas_strucdiv as ixs on ixs.uuid = igs.structurally_diverse_uuid 
-where igs.uuid in 
-(select substance_uuid from np_substance) or 
-igs.uuid in
-(select parent_uuid from np_parent)
-
---add to test_srs_np_part
-with np_substance_part as (
-select igss.uuid as part_uuid from ix_ginas_substanceref igss
-where igss.refuuid = 'f42f059e-c9c1-46cf-a593-dcc545abb8d1'
-) 
-insert into scratch_sanya.test_srs_np_part
-select 'Rhodiola rosea' related_latin_binomial, 'Rhodiola' related_common_name, igs.dtype, igs.uuid as substance_uuid, igs.created, igs.class, igs.status, igs.modifications_uuid,
-igs.approval_id, igs.structure_id, igs.structurally_diverse_uuid, 
-ign.uuid as name_uuid, ign.internal_references, ign.owner_uuid, ign."name",
-ign."type", ign.preferred, ign.display_name, 
-ixs.uuid as structdiv_uuid, ixs.source_material_class, ixs.source_material_state, ixs.source_material_type,
-ixs.organism_family, ixs.organism_author, ixs.organism_genus, ixs.organism_species, ixs.part_location,
-ixs.part, ixs.parent_substance_uuid 
-from ix_ginas_substance igs 
-inner join ix_ginas_name as ign on ign.owner_uuid = igs.uuid 
-inner join ix_ginas_strucdiv as ixs on ixs.uuid = igs.structurally_diverse_uuid 
-where ixs.parent_substance_uuid in (select part_uuid from np_substance_part)
-and igs.dtype = 'DIV'
-
---add to test_srs_np_part_rel test_srs_np_rel
-with np_substance_part as (
-select igss.uuid as part_uuid from ix_ginas_substanceref igss
-where igss.refuuid = 'f42f059e-c9c1-46cf-a593-dcc545abb8d1'
-),
-np_substance as (
-select igs.uuid as substance_uuid, igs.dtype from ix_ginas_substance igs
-inner join ix_ginas_strucdiv as ixs on ixs.uuid = igs.structurally_diverse_uuid
-where ixs.parent_substance_uuid in (select part_uuid from np_substance_part)
-and igs.dtype = 'DIV'
-)
-insert into scratch_sanya.test_srs_np_part_rel
-select 'Rhodiola rosea' related_latin_binomial, 'Rhodiola' related_common_name, igr.*  
-from ix_ginas_relationship igr
-where igr.owner_uuid in (select substance_uuid from np_substance)
-
-insert into scratch_sanya.test_srs_np_rel 
-select 'Rhodiola rosea' related_latin_binomial, 'Rhodiola' related_common_name, igr.*  
-from ix_ginas_relationship igr
-where igr.owner_uuid = 'f42f059e-c9c1-46cf-a593-dcc545abb8d1'
-
+--Do we need to run DSLD again??
 --add to test_srs_np_dsld: for all uuids
+select * from scratch_sanya.test_srs_np_dsld tsnd 
+where tsnd.related_latin_binomial = 'Camellia sinensis'
+
 drop table if exists scratch_sanya.test_srs_np_dsld
+
 CREATE TABLE scratch_sanya.test_srs_np_dsld (
         related_latin_binomial varchar(255) NOT NULL,
         related_common_name varchar(40) NULL,
@@ -140,6 +67,7 @@ CREATE TABLE scratch_sanya.test_srs_np_dsld (
         dsld_text varchar(255) NULL
 )
 
+--N=191
 insert into scratch_sanya.test_srs_np_dsld
 select distinct tsn.related_latin_binomial, tsn.related_common_name, tsn.substance_uuid, tsn.organism_family, tsn.organism_genus, tsn.organism_species, 
 igc.code as dsld_code, regexp_replace(igc.comments, '^.*\|','') as dsld_text
@@ -153,6 +81,87 @@ where igc.code_system = 'DSLD'
 
 --ran constituents again after this
 
+--Constituent queries for sample constituent annotations
+select tsnc.related_latin_binomial, tsnc.related_common_name, tsnc.constituent_name, tsnc.relation_type  from scratch_sanya.test_srs_np_constituent tsnc 
+where related_latin_binomial in ('Allium sativum', 'Gentiana lutea', 'Zingiber officinale', 'Camellia sinensis',
+'Paullinia cupana', 'Humulus lupulus', 'Paspalum distichum', 'Aloysia citrodora', 'Origanum majorana', 'Silybum marianum')
+
+--extraction
+select * from scratch_sanya.test_srs_np_part tsn 
+where tsn.related_latin_binomial = 'Camellia sinensis'
+
+select * from scratch_sanya_2023.test_srs_np tsn 
+where tsn.substance_uuid = '0e564403-14be-4537-8f3e-583022cbb33b'
+
+select * from scratch_sanya.test_srs_np_constituent tsnc 
+where tsnc.related_latin_binomial in ('Withania somnifera', 'Actaea racemosa', 'Piper nigrum', 
+'Cinnamomum cassia', 'Cinnamomum verum', 'Vaccinium macrocarpon', 'Echinacea purpurea', 
+'Trigonella foenum', 'Tanacetum parthenium', 'Linum usitatissimum', 'Allium sativum', 
+'Zingiber officinale', 'Ginkgo biloba', 'Hydrastis canadensis', 'Citrus paradisi', 
+'Camellia sinensis', 'Paullinia cupana', 'Cannabis sativa', 'Aesculus hippocastanum', 
+'Mitragyna speciosa', 'Glycyrrhiza glabra', 'Glycyrrhiza inflata', 'Glycyrrhiza uralensis', 
+'Taraxacum officinale', 'Silybum marianum', 'Origanum vulgare', 'Panax ginseng', 'Rhodiola rosea', 
+'Rosmarinus officinalis', 'Serenoa repens', 'Glycine max', 'Curcuma longa', 
+'Valeriana officinalis', 'Crataegus laevigata')
+order by related_latin_binomial 
+
+drop table scratch_sanya.test_srs_np_constituent_mapped 
+
+--Map constituents
+create table scratch_sanya.test_srs_np_constituent_mapped (
+	uuid varchar(40),
+	substance_uuid varchar(40),
+	constituent_uuid varchar(40),
+	related_common_name varchar(255),
+	related_latin_binomial varchar(255),
+	relation_type varchar(255),
+	constituent_name varchar(255),
+	constituent_code_type varchar(20),
+	constituent_code varchar (20)
+)
+
+--N=736
+select count(distinct constituent_uuid) from scratch_sanya.test_srs_np_constituent tsnc 
+
+select count(*), igc.code_system from ix_ginas_code igc 
+group by igc.code_system 
+
+--check catechin mappings
+select * from ix_ginas_code igc 
+where igc.owner_uuid = '5e3251fe-d591-4ac6-a8ad-679a3fe17e21'
+
+select * from scratch_sanya.test_srs_np_constituent tsnc 
+where tsnc.constituent_name = 'CIANIDANOL'
+
+--get identifiers of constituents (CHEBI, PUBCHEM, RXCUI)
+--N=1521
+INSERT INTO scratch_sanya.test_srs_np_constituent_mapped (uuid, substance_uuid, constituent_uuid, 
+related_common_name, related_latin_binomial, relation_type, constituent_name, constituent_code_type,
+constituent_code)
+select tsnc.uuid, tsnc.substance_uuid, tsnc.constituent_uuid, tsnc.related_common_name,
+tsnc.related_latin_binomial, tsnc.relation_type, tsnc.constituent_name, igc.code_system, igc.code 
+from scratch_sanya.test_srs_np_constituent tsnc 
+left join ix_ginas_code igc on tsnc.constituent_uuid = igc.owner_uuid
+and igc.code_system in ('PUBCHEM', 'RXCUI')
+
+select * from scratch_sanya.test_srs_np_constituent_mapped tsnc 
+where tsnc.constituent_code is NULL
+
+--N=736
+select count(distinct constituent_uuid) from scratch_sanya.test_srs_np_constituent_mapped tsnc 
+
+--extract mapped constituents for 30 NPs
+select * from scratch_sanya.test_srs_np_constituent_mapped tsnc 
+where tsnc.related_latin_binomial in ('Withania somnifera', 'Actaea racemosa', 'Piper nigrum', 
+'Cinnamomum cassia', 'Cinnamomum verum', 'Vaccinium macrocarpon', 'Echinacea purpurea', 
+'Trigonella foenum', 'Tanacetum parthenium', 'Linum usitatissimum', 'Allium sativum', 
+'Zingiber officinale', 'Ginkgo biloba', 'Hydrastis canadensis', 'Citrus paradisi', 
+'Camellia sinensis', 'Paullinia cupana', 'Cannabis sativa', 'Aesculus hippocastanum', 
+'Mitragyna speciosa', 'Glycyrrhiza glabra', 'Glycyrrhiza inflata', 'Glycyrrhiza uralensis', 
+'Taraxacum officinale', 'Silybum marianum', 'Origanum vulgare', 'Panax ginseng', 'Rhodiola rosea', 
+'Rosmarinus officinalis', 'Serenoa repens', 'Glycine max', 'Curcuma longa', 
+'Valeriana officinalis', 'Crataegus laevigata')
+order by related_latin_binomial 
 
 
 
